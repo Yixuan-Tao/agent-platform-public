@@ -1,0 +1,74 @@
+name: platform-regression
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  platform:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: agent
+          POSTGRES_PASSWORD: test-only
+          POSTGRES_DB: agent_platform_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U agent"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      LLM_API_KEY: ""
+      MIGRATION_DATABASE_URL: postgresql+asyncpg://agent:test-only@localhost:5432/agent_platform_test
+      PYTHONPATH: packages/core/src:packages/tools/src:packages/memory/src:packages/orchestrator/src:packages/agents/src:packages/skills/src:packages/evaluation/src:apps/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r deploy/requirements.txt
+      - name: Incremental PostgreSQL migration and repeat upgrade
+        run: |
+          python -m alembic upgrade head
+          python -m alembic upgrade head
+      - name: Offline regression
+        run: python -m pytest packages/core/tests packages/orchestrator/tests packages/tools/tests packages/memory/tests packages/evaluation/tests apps/api/tests -q
+      - name: PostgreSQL ownership, lease, recovery and approval integration
+        env:
+          PLATFORM_TEST_DATABASE_URL: postgresql+asyncpg://agent:test-only@localhost:5432/agent_platform_test
+        run: python -m pytest packages/orchestrator/tests/test_runtime.py -q
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm build
+  rag-unit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/rag
+    env:
+      LLM_API_KEY: ""
+      ONEAPI_API_KEY: ""
+      CHAT_API_KEY: ""
+      DASHSCOPE_API_KEY: ""
+      RUNTIME_DIR: /tmp/agent-platform-rag-test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt pytest pytest-asyncio
+      - name: Offline RAG and delegated runtime contract regression
+        run: python -m pytest tests/unit -q

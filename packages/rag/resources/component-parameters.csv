@@ -1,0 +1,9 @@
+1. TVS (synthetic),,,
+序号,关键参数,替代评估要点,风险等级
+1,V_BR (V),Synthetic field for parser demonstration,高
+2,VRWM (V),Synthetic voltage field,中
+,,,
+2. MOSFET (synthetic),,,
+序号,关键参数,替代评估要点,风险等级
+1,V_DSS (V),Synthetic voltage field,高
+2,R_DS (ohm),Synthetic resistance field,中

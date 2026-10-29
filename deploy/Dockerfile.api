@@ -1,0 +1,23 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONPATH=/app/packages/core/src:/app/packages/tools/src:/app/packages/memory/src:/app/packages/orchestrator/src:/app/packages/agents/src:/app/packages/skills/src:/app/packages/evaluation/src:/app/apps/api
+
+COPY deploy/requirements.txt /tmp/requirements.txt
+# chromadb → sentence-transformers → torch：PyPI 默认的 Linux wheel 自带整套 CUDA，
+# 约 5GB 的 nvidia-* 依赖。平台容器不做本地推理（向量由 RAG 服务提供），
+# 先装 CPU 版 torch，后续 pip 安装会认为已满足，从而跳过 CUDA 依赖。
+RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+
+COPY packages /app/packages
+COPY skills /app/skills
+COPY alembic.ini /app/alembic.ini
+COPY migrations /app/migrations
+COPY apps/api /app/apps/api
+
+WORKDIR /app/apps/api
+EXPOSE 8000
+# 通过 run.py 启动：LAN_ENABLED=true 时强制 HTTPS，避免绕过 TLS 配置
+CMD ["python", "run.py"]

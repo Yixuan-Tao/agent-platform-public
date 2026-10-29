@@ -1,0 +1,20 @@
+[tool.pytest.ini_options]
+pythonpath = [
+  "packages/core/src",
+  "packages/tools/src",
+  "packages/memory/src",
+  "packages/orchestrator/src",
+  "packages/agents/src",
+  "packages/skills/src",
+  "packages/evaluation/src",
+  "apps/api",
+]
+testpaths = ["packages", "apps/api/tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]

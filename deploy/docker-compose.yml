@@ -1,0 +1,163 @@
+services:
+  rag:
+    build: ../packages/rag
+    ports:
+      # 主机端口可通过 RAG_HOST_PORT 覆盖（默认 8010）
+      - "${RAG_HOST_PORT:-8010}:8010"
+    environment:
+      PORT: "8010"
+      HOST: "0.0.0.0"
+      CHROMA_DB_PATH: /data/chroma_data
+      RUNTIME_DIR: /data/runtime_data
+      # 网关用同一凭据调用 RAG 写操作；本机模式作为 X-Local-Token
+      LOCAL_API_TOKEN: ${RAG_SERVICE_TOKEN:-dev-rag-token-change-me}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
+      # embedding / rerank / VL 走 ONEAPI_*，不是 LLM_*。
+      # 若 LLM_BASE_URL 指向纯对话网关（如 DeepSeek，没有 /embeddings），
+      # 必须显式传入这两个变量，否则向量化会 404、入库静默为 0 条。
+      ONEAPI_BASE_URL: ${ONEAPI_BASE_URL:-}
+      ONEAPI_API_KEY: ${ONEAPI_API_KEY:-}
+      CHAT_MODEL: ${CHAT_MODEL:-}
+      VL_MODEL: ${VL_MODEL:-}
+      EMBED_MODEL: ${EMBED_MODEL:-}
+      IMAGE_EMBED_MODEL: ${IMAGE_EMBED_MODEL:-}
+      RERANK_MODEL: ${RERANK_MODEL:-}
+      RERANK_BASE_URL: ${RERANK_BASE_URL:-}
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+      DASHSCOPE_WORKSPACE_ID: ${DASHSCOPE_WORKSPACE_ID:-}
+      DASHSCOPE_MULTIMODAL_URL: ${DASHSCOPE_MULTIMODAL_URL:-}
+      ENABLE_VISUAL_SEARCH: ${ENABLE_VISUAL_SEARCH:-false}
+      EMBED_BATCH_SIZE: ${EMBED_BATCH_SIZE:-10}
+      LAN_ENABLED: ${LAN_ENABLED:-false}
+      TLS_CERT_FILE: ${TLS_CERT_FILE:-}
+      TLS_KEY_FILE: ${TLS_KEY_FILE:-}
+      INITIAL_ADMIN_USERNAME: ${INITIAL_ADMIN_USERNAME:-}
+      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:-}
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-}
+      MODEL_GATEWAY_ALLOWED_HOSTS: ${MODEL_GATEWAY_ALLOWED_HOSTS:-}
+      MAX_INGEST_TASKS: ${MAX_INGEST_TASKS:-20}
+    volumes:
+      - rag_data:/data
+    networks:
+      - app_net
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-agent}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
+      POSTGRES_DB: ${POSTGRES_DB:-agent_platform}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-agent}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - app_net
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    networks:
+      - app_net
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    ports:
+      # 主机端口可通过 API_HOST_PORT 覆盖。注意：宿主机 8000 常被其它本地服务占用
+      # （例如 workspace/project），冲突时浏览器 localhost 会打到错误的服务上。
+      - "${API_HOST_PORT:-8000}:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-agent}:${POSTGRES_PASSWORD:-}@postgres:5432/${POSTGRES_DB:-agent_platform}
+      REDIS_URL: redis://redis:6379/0
+      USE_FAKEREDIS: "false"
+      # 容器内一律走 Compose DNS。不要复用宿主机的 RAG_SERVICE_URL
+      # （本地开发通常写 http://localhost:8010，进容器后指向 api 自己）。
+      # LAN 模式（RAG 强制 HTTPS）请设置 RAG_INTERNAL_URL=https://rag:8010
+      RAG_SERVICE_URL: ${RAG_INTERNAL_URL:-http://rag:8010}
+      RAG_SERVICE_TOKEN: ${RAG_SERVICE_TOKEN:-dev-rag-token-change-me}
+      RAG_RUNTIME_CONTRACT_ENABLED: ${RAG_RUNTIME_CONTRACT_ENABLED:-false}
+      RAG_DELEGATE_MODEL_REQUESTS: ${RAG_DELEGATE_MODEL_REQUESTS:-8}
+      RAG_DELEGATE_TOKENS: ${RAG_DELEGATE_TOKENS:-32000}
+      CHROMA_DIR: /data/chroma_data
+      # access.db / audit.db 落在挂载卷内，容器重建后账号与审计不丢失
+      RUNTIME_DIR: /data/runtime_data
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
+      CHAT_MODEL: ${CHAT_MODEL:-qwen3.7-plus}
+      MODEL_OVERRIDES: ${MODEL_OVERRIDES:-{}}
+      API_KEY: ${API_KEY:-dev-key-change-me}
+      LOG_DIR: /data/logs
+      LAN_ENABLED: ${LAN_ENABLED:-false}
+      TLS_CERT_FILE: ${TLS_CERT_FILE:-}
+      TLS_KEY_FILE: ${TLS_KEY_FILE:-}
+      INITIAL_ADMIN_USERNAME: ${INITIAL_ADMIN_USERNAME:-}
+      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:-}
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-}
+      MODEL_GATEWAY_ALLOWED_HOSTS: ${MODEL_GATEWAY_ALLOWED_HOSTS:-}
+      # 编排开关（此前只在 .env.example / README 里写了，容器里其实读不到）
+      USE_ROUTER_REACT: ${USE_ROUTER_REACT:-false}
+      PLAN_MODE: ${PLAN_MODE:-true}
+      MAX_PLAN_STEPS: ${MAX_PLAN_STEPS:-6}
+      MAX_AGENT_CALLS: ${MAX_AGENT_CALLS:-4}
+      AGENT_CALL_BUDGET: ${AGENT_CALL_BUDGET:-8}
+      ANSWER_STREAMING: ${ANSWER_STREAMING:-false}
+      RUNS_ENABLED: ${RUNS_ENABLED:-false}
+      CHAT_VIA_RUNS: ${CHAT_VIA_RUNS:-false}
+      EXPERIMENTS_ENABLED: ${EXPERIMENTS_ENABLED:-false}
+      DEFAULT_RUN_PROFILE: ${DEFAULT_RUN_PROFILE:-B0}
+      SERVICE_TOOL_SCOPES: ${SERVICE_TOOL_SCOPES:-[]}
+      USER_TOOL_SCOPES: ${USER_TOOL_SCOPES:-["jira:read","jira:create"]}
+      SEMANTIC_MEMORY_ENABLED: ${SEMANTIC_MEMORY_ENABLED:-false}
+      TOOL_DISCOVERY_ENABLED: ${TOOL_DISCOVERY_ENABLED:-false}
+      # Compose API 容器不挂 Docker socket；容器执行另行验收，不自动开放宿主权限。
+      SANDBOX_ENABLED: "false"
+      ONEAPI_BASE_URL: ${ONEAPI_BASE_URL:-}
+      ONEAPI_API_KEY: ${ONEAPI_API_KEY:-}
+      EMBED_MODEL: ${EMBED_MODEL:-text-embedding-v4}
+      LANGFUSE_ENABLED: ${LANGFUSE_ENABLED:-false}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      LANGFUSE_HOST: ${LANGFUSE_HOST:-https://cloud.langfuse.com}
+      # 网关根路径索引里回给浏览器的前端地址
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+    volumes:
+      - rag_data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      rag:
+        condition: service_started
+    networks:
+      - app_net
+
+  web:
+    build:
+      context: ../apps/web
+      args:
+        # Next.js 在构建期内联 NEXT_PUBLIC_*，改端口必须重新构建 web 镜像
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    ports:
+      - "${WEB_HOST_PORT:-3000}:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    depends_on:
+      - api
+    networks:
+      - app_net
+
+volumes:
+  rag_data:
+  pg_data:
+  redis_data:
+
+networks:
+  app_net:

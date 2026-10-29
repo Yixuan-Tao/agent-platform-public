@@ -1,0 +1,15 @@
+{
+  "_comment": "Generic terminology for software tests; no corpus-derived aliases.",
+  "BCI": [
+    "大电流注入",
+    "Bulk Current Injection"
+  ],
+  "V_BR": [
+    "击穿电压",
+    "Breakdown Voltage"
+  ],
+  "8/20us": [
+    "8/20μs",
+    "8 20 us"
+  ]
+}

@@ -1,0 +1,113 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+.env.bak
+
+# pytest / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+tests/.tmp/
+tests/output/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Logs & runtime data
+*.log
+logs/
+nohup.out
+*.pid
+
+# ChromaDB / vector DB
+*.db
+*.lock
+data/
+chroma_data/
+collections/
+
+# Uploaded files
+uploads/
+tmp/
+
+# Sensitive
+.env
+.env.local
+.env.*.local
+
+# 临时测试/调试文件（防止再次提交）
+*_body.json
+*_body2.json
+*_result.txt
+*_result2.txt
+*_result3.txt
+*_result.json
+*_response.json
+*_output.txt
+*_output2.txt
+*_check.txt
+*_log.txt
+*_test.txt
+*_dump*.txt
+*_out.txt
+*_out2.txt
+*_stdout.txt
+*_stderr.txt
+*_report.txt
+*_report.html
+*_result.html
+*_cold.txt
+*_full_test.txt
+compare_*.md
+对比*.md
+debug_results*.tsv
+test_minimal.py
+test_pipeline.py
+test_upload.py
+test_upload2.py
+parse_doc.py
+gen_summary.py
+parse_result.json
+pipeline_test_result.json
+
+# 备份 & 缓存
+chroma_data.bak.*/
+mock_chroma_data/
+cache/
+runtime_data/

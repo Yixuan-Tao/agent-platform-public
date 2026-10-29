@@ -1,0 +1,1169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多模态 RAG 控制台</title>
+    <style>
+        :root {
+            --bg: #f5f5f7;
+            --surface: #ffffff;
+            --surface-hover: #f0f0f2;
+            --border: #e0e0e2;
+            --text: #1d1d1f;
+            --text-secondary: #86868b;
+            --accent: #0071e3;
+            --accent-hover: #0077ed;
+            --danger: #ff3b30;
+            --success: #34c759;
+            --warning: #ff9500;
+            --radius: 10px;
+            --shadow: 0 1px 3px rgba(0,0,0,0.08);
+            --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Segoe UI", Roboto, sans-serif;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--text);
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+        /* 侧边栏 */
+        .sidebar {
+            width: 220px;
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+        .sidebar-header h1 {
+            font-size: 18px;
+            font-weight: 600;
+            letter-spacing: -0.3px;
+        }
+        .sidebar-header p {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+        .nav {
+            flex: 1;
+            padding: 12px;
+        }
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-size: 14px;
+            color: var(--text-secondary);
+            transition: all 0.15s;
+            margin-bottom: 4px;
+        }
+        .nav-item:hover { background: var(--surface-hover); color: var(--text); }
+        .nav-item.active { background: var(--accent); color: #fff; }
+        .nav-icon { width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; }
+        .status-bar {
+            padding: 12px 16px;
+            border-top: 1px solid var(--border);
+            font-size: 12px;
+        }
+        .status-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+        .status-dot.ok { background: var(--success); }
+        .status-dot.degraded { background: var(--warning); }
+        .status-dot.error { background: var(--danger); }
+        /* 主内容 */
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .page { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+        .page.active { display: flex; }
+        .page-header {
+            padding: 16px 24px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .page-header h2 { font-size: 16px; font-weight: 600; }
+        /* 聊天页面 */
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 24px;
+        }
+        .message {
+            max-width: 80%;
+            margin-bottom: 16px;
+            display: flex;
+            flex-direction: column;
+        }
+        .message.user { align-items: flex-end; margin-left: auto; }
+        .message.assistant { align-items: flex-start; }
+        .message-bubble {
+            padding: 12px 16px;
+            border-radius: var(--radius);
+            font-size: 14px;
+            line-height: 1.6;
+            word-break: break-word;
+        }
+        .message.user .message-bubble {
+            background: var(--accent);
+            color: #fff;
+            border-bottom-right-radius: 2px;
+        }
+        .message.assistant .message-bubble {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-bottom-left-radius: 2px;
+        }
+        .message-time {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+        .message-images {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+            flex-wrap: wrap;
+        }
+        .message-images img {
+            width: 160px;
+            height: 120px;
+            object-fit: cover;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            cursor: pointer;
+        }
+        .chat-input-area {
+            padding: 16px 24px;
+            background: var(--surface);
+            border-top: 1px solid var(--border);
+        }
+        .chat-input-row {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+        .chat-input {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 14px;
+            font-family: var(--font);
+            resize: none;
+            min-height: 44px;
+            max-height: 120px;
+            outline: none;
+        }
+        .chat-input:focus { border-color: var(--accent); }
+        .btn {
+            padding: 10px 18px;
+            border: none;
+            border-radius: var(--radius);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+            font-family: var(--font);
+            white-space: nowrap;
+        }
+        .btn-primary { background: var(--accent); color: #fff; }
+        .btn-primary:hover { background: var(--accent-hover); }
+        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-danger { background: var(--danger); color: #fff; }
+        .btn-secondary { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
+        .chat-settings {
+            display: flex;
+            gap: 12px;
+            margin-top: 10px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            align-items: center;
+        }
+        .chat-settings label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+        .chat-settings input[type="checkbox"] { cursor: pointer; }
+        .chat-settings input[type="number"] {
+            width: 50px; padding: 2px 6px; border: 1px solid var(--border);
+            border-radius: 4px; font-size: 12px;
+        }
+        .chat-settings select {
+            padding: 2px 6px; border: 1px solid var(--border);
+            border-radius: 4px; font-size: 12px; font-family: var(--font);
+        }
+        /* 文档页面 */
+        .docs-toolbar {
+            padding: 16px 24px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .docs-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 24px 24px;
+        }
+        .doc-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .doc-info h4 { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+        .doc-info p { font-size: 12px; color: var(--text-secondary); }
+        .doc-actions { display: flex; gap: 8px; }
+        .upload-zone {
+            border: 2px dashed var(--border);
+            border-radius: var(--radius);
+            padding: 32px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.15s;
+            background: var(--surface);
+        }
+        .upload-zone:hover, .upload-zone.dragover { border-color: var(--accent); background: #f0f7ff; }
+        .upload-zone p { font-size: 14px; color: var(--text-secondary); margin-top: 8px; }
+        .task-item {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+        .task-item.done { border-left: 3px solid var(--success); }
+        .task-item.error { border-left: 3px solid var(--danger); }
+        .task-item.processing { border-left: 3px solid var(--accent); }
+        /* 表格 */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            background: var(--surface);
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+        th, td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        th {
+            background: var(--bg);
+            font-weight: 500;
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        tr:last-child td { border-bottom: none; }
+        /* 对比页面 */
+        .compare-form {
+            padding: 16px 24px;
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+        .compare-form input, .compare-form select {
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 14px;
+            font-family: var(--font);
+            min-width: 200px;
+        }
+        .compare-result {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 24px 24px;
+        }
+        .compare-section {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+        .compare-section h3 {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+        /* 状态页面 */
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 16px;
+            padding: 24px;
+        }
+        .status-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+        }
+        .status-card h3 {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+        .status-card .value {
+            font-size: 28px;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+        }
+        .status-card .value.ok { color: var(--success); }
+        .status-card .value.error { color: var(--danger); }
+        .log-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+        }
+        .log-entry {
+            font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+            font-size: 12px;
+            padding: 4px 0;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+        /* 通用 */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+        .empty-state p { margin-top: 8px; font-size: 14px; }
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        .badge-blue { background: #e8f4fd; color: var(--accent); }
+        .badge-green { background: #e8f5e9; color: #2e7d32; }
+        .badge-red { background: #ffebee; color: #c62828; }
+        .hidden { display: none !important; }
+        pre {
+            background: #f6f6f7;
+            padding: 12px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+            font-size: 12px;
+            line-height: 1.5;
+            margin: 8px 0;
+        }
+        code {
+            font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+            font-size: 12px;
+            background: #f6f6f7;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        /* ---- Markdown 渲染样式（消息气泡内） ---- */
+        .message-bubble.markdown h1,
+        .message-bubble.markdown h2,
+        .message-bubble.markdown h3,
+        .message-bubble.markdown h4,
+        .message-bubble.markdown h5,
+        .message-bubble.markdown h6 {
+            margin: 12px 0 6px;
+            font-weight: 600;
+            line-height: 1.3;
+        }
+        .message-bubble.markdown h1 { font-size: 1.4em; }
+        .message-bubble.markdown h2 { font-size: 1.25em; }
+        .message-bubble.markdown h3 { font-size: 1.1em; }
+        .message-bubble.markdown h4 { font-size: 1em; }
+        .message-bubble.markdown p { margin: 6px 0; }
+        .message-bubble.markdown ul,
+        .message-bubble.markdown ol {
+            margin: 6px 0;
+            padding-left: 22px;
+        }
+        .message-bubble.markdown li { margin: 3px 0; }
+        .message-bubble.markdown blockquote {
+            margin: 8px 0;
+            padding: 6px 12px;
+            border-left: 3px solid var(--border);
+            color: var(--text-secondary);
+            background: #f9f9fb;
+            border-radius: 0 6px 6px 0;
+        }
+        .message-bubble.markdown table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 8px 0;
+            font-size: 13px;
+        }
+        .message-bubble.markdown th,
+        .message-bubble.markdown td {
+            border: 1px solid var(--border);
+            padding: 6px 10px;
+            text-align: left;
+        }
+        .message-bubble.markdown th {
+            background: var(--bg);
+            font-weight: 600;
+        }
+        .message-bubble.markdown hr {
+            border: none;
+            border-top: 1px solid var(--border);
+            margin: 12px 0;
+        }
+        .message-bubble.markdown a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+        .message-bubble.markdown a:hover { text-decoration: underline; }
+        .message-bubble.markdown pre {
+            background: #f6f6f7;
+            padding: 10px 12px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 8px 0;
+        }
+        .message-bubble.markdown pre code {
+            background: none;
+            padding: 0;
+            font-size: 12px;
+        }
+        .message-bubble.markdown code {
+            font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+            font-size: 0.88em;
+            background: #f0f0f2;
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+        /* 用户消息中的 code 不需要背景色（蓝色底） */
+        .message.user .message-bubble code {
+            background: rgba(255,255,255,0.15);
+            padding: 1px 4px;
+            border-radius: 3px;
+        }
+        /* 图片画廊增强 */
+        .message-images {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+        .message-images .image-item {
+            position: relative;
+            display: inline-block;
+        }
+        .message-images img {
+            width: 180px;
+            height: 140px;
+            object-fit: contain;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            cursor: pointer;
+            background: #f9f9fb;
+            transition: transform 0.15s;
+        }
+        .message-images img:hover {
+            transform: scale(1.03);
+            border-color: var(--accent);
+        }
+        .image-caption {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-align: center;
+            margin-top: 3px;
+            max-width: 180px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <!-- 侧边栏 -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h1>RAG 控制台</h1>
+            <p>多模态检索增强生成</p>
+        </div>
+        <nav class="nav">
+            <div class="nav-item active" data-page="chat">
+                <span class="nav-icon">&#128172;</span>
+                <span>对话检索</span>
+            </div>
+            <div class="nav-item" data-page="docs">
+                <span class="nav-icon">&#128196;</span>
+                <span>文档管理</span>
+            </div>
+            <div class="nav-item" data-page="compare">
+                <span class="nav-icon">&#8644;</span>
+                <span>对比分析</span>
+            </div>
+            <div class="nav-item" data-page="status">
+                <span class="nav-icon">&#128161;</span>
+                <span>系统状态</span>
+            </div>
+            <div class="nav-item" data-page="evidence">
+                <span class="nav-icon">&#128203;</span>
+                <span>证据版本</span>
+            </div>
+        </nav>
+        <div class="status-bar">
+            <span id="conn-status"><span class="status-dot"></span>连接中...</span>
+        </div>
+    </aside>
+
+    <!-- 主内容 -->
+    <main class="main">
+        <!-- 聊天页面 -->
+        <section class="page active" id="page-chat">
+            <div class="page-header">
+                <h2>对话检索</h2>
+                <button class="btn btn-secondary" onclick="clearChat()">清空对话</button>
+            </div>
+            <div class="chat-container">
+                <div class="chat-messages" id="chat-messages"></div>
+                <div class="chat-input-area">
+                    <div class="chat-input-row">
+                        <textarea class="chat-input" id="chat-input" rows="1" placeholder="输入问题，按 Enter 发送，Shift+Enter 换行..."></textarea>
+                        <button class="btn btn-primary" id="send-btn" onclick="sendMessage()">发送</button>
+                    </div>
+                    <div class="chat-settings">
+                        <label>top_k: <input type="number" id="top-k" value="5" min="1" max="20"></label>
+                        <label><input type="checkbox" id="use-rerank" checked> 重排序</label>
+                        <label>语言: <select id="chat-lang"><option value="">自动</option><option value="zh">中文</option><option value="en">英文</option><option value="de">德文</option></select></label>
+                        <label><input type="checkbox" id="stream-mode" checked> 流式输出</label>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 证据版本页面：导入和发布操作由服务端管理员权限再次校验 -->
+        <section class="page" id="page-evidence">
+            <div class="page-header"><h2>人工证据版本</h2><button class="btn btn-secondary" onclick="loadEvidenceVersions()">刷新</button></div>
+            <div class="compare-form">
+                <input type="text" id="evidence-name" placeholder="版本名称，例如 EMC 基线 2026-01">
+                <input type="file" id="evidence-file" accept=".xlsx">
+                <button class="btn btn-primary" onclick="importEvidenceWorkbook()">导入 Excel 草稿</button>
+            </div>
+            <div class="docs-list" id="evidence-list"><div class="empty-state"><p>暂无已导入证据版本</p></div></div>
+        </section>
+
+        <!-- 文档页面 -->
+        <section class="page" id="page-docs">
+            <div class="page-header">
+                <h2>文档管理</h2>
+                <span id="docs-count" class="badge badge-blue">0 个文档</span>
+            </div>
+            <div class="docs-toolbar">
+                <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
+                    <div style="font-size: 28px;">&#128449;</div>
+                    <p>点击或拖拽上传 PDF / DOCX / 图片</p>
+                    <input type="file" id="file-input" style="display:none" accept=".pdf,.docx,.png,.jpg,.jpeg" onchange="handleFileSelect(event)">
+                </div>
+            </div>
+            <div class="docs-list" id="docs-list">
+                <div class="empty-state">
+                    <p>暂无文档，请上传文件</p>
+                </div>
+            </div>
+            <div style="padding: 0 24px 24px;">
+                <h3 style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">上传任务</h3>
+                <div id="task-list"></div>
+            </div>
+        </section>
+
+        <!-- 对比页面 -->
+        <section class="page" id="page-compare">
+            <div class="page-header"><h2>对比分析</h2></div>
+            <div class="compare-form">
+                <input type="text" id="compare-query" placeholder="输入对比问题，如：对比两颗 TVS 的钳位电压">
+                <select id="compare-doc-a"><option value="">选择文档 A</option></select>
+                <select id="compare-doc-b"><option value="">选择文档 B</option></select>
+                <button class="btn btn-primary" onclick="doCompare()">开始对比</button>
+            </div>
+            <div class="compare-result" id="compare-result"></div>
+        </section>
+
+        <!-- 状态页面 -->
+        <section class="page" id="page-status">
+            <div class="page-header">
+                <h2>系统状态</h2>
+                <button class="btn btn-secondary" onclick="refreshStatus()">刷新</button>
+            </div>
+            <div class="status-grid" id="status-grid">
+                <div class="status-card">
+                    <h3>服务状态</h3>
+                    <div class="value" id="status-service">-</div>
+                </div>
+                <div class="status-card">
+                    <h3>ChromaDB</h3>
+                    <div class="value" id="status-chroma">-</div>
+                </div>
+                <div class="status-card">
+                    <h3>文档数量</h3>
+                    <div class="value" id="status-docs">-</div>
+                </div>
+                <div class="status-card">
+                    <h3>Chunk 数量</h3>
+                    <div class="value" id="status-chunks">-</div>
+                </div>
+            </div>
+            <div class="log-area" id="log-area">
+                <div class="empty-state"><p>系统日志将显示在这里</p></div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // ==================== 配置 ====================
+        const API_BASE = '';  // 同域部署，使用相对路径
+        const LOCAL_API_TOKEN = '__LOCAL_API_TOKEN__';
+        const LAN_ENABLED = __LAN_ENABLED__;
+        const localMutationHeaders = { 'X-Local-Token': LOCAL_API_TOKEN };
+        let accessToken = sessionStorage.getItem('intern-rag-access-token') || '';
+        const nativeFetch = window.fetch.bind(window);
+        window.fetch = async (input, init = {}) => {
+            const headers = new Headers(init.headers || {});
+            if (accessToken && !String(input).includes('/auth/')) headers.set('Authorization', `Bearer ${accessToken}`);
+            return nativeFetch(input, { ...init, headers });
+        };
+        async function ensureLanSession() {
+            if (!LAN_ENABLED || accessToken) return;
+            const username = window.prompt('请输入团队账号');
+            const password = username && window.prompt('请输入密码');
+            if (!username || !password) return;
+            const response = await nativeFetch(`${API_BASE}/auth/login`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({username, password})});
+            if (!response.ok) { alert('登录失败'); return; }
+            accessToken = (await response.json()).access_token;
+            sessionStorage.setItem('intern-rag-access-token', accessToken);
+        }
+        const messages = [];  // 聊天历史
+        let activeTasks = new Map();  // 上传任务轮询
+
+        // ==================== 导航 ====================
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', () => {
+                document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+                item.classList.add('active');
+                const page = item.dataset.page;
+                document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                document.getElementById('page-' + page).classList.add('active');
+                if (page === 'docs') loadDocuments();
+                if (page === 'status') refreshStatus();
+                if (page === 'compare') loadDocumentsForCompare();
+                if (page === 'evidence') loadEvidenceVersions();
+            });
+        });
+
+        async function loadEvidenceVersions() {
+            const result = await fetch(`${API_BASE}/evidence/versions`);
+            const data = await result.json();
+            const container = document.getElementById('evidence-list');
+            if (!result.ok) { container.innerHTML = `<div class="empty-state"><p>${escapeHtml(data.detail || '无法读取证据版本')}</p></div>`; return; }
+            container.innerHTML = (data.versions || []).map(v => `<div class="doc-item"><div><strong>${escapeHtml(v.name)}</strong><div class="doc-meta">${escapeHtml(v.domain)} · ${escapeHtml(v.status)}</div></div>${v.status === 'draft' ? `<button class="btn btn-primary" onclick="publishEvidenceVersion('${v.id}')">发布</button>` : v.status === 'archived' ? `<button class="btn btn-secondary" onclick="activateEvidenceVersion('${v.id}')">回退到此版本</button>` : ''}</div>`).join('') || '<div class="empty-state"><p>暂无已导入证据版本</p></div>';
+        }
+        async function importEvidenceWorkbook() {
+            const file = document.getElementById('evidence-file').files[0];
+            const name = document.getElementById('evidence-name').value.trim();
+            if (!file || !name) { alert('请填写版本名称并选择 Excel 文件'); return; }
+            const body = new FormData(); body.append('file', file);
+            const result = await fetch(`${API_BASE}/evidence/import?name=${encodeURIComponent(name)}`, {method: 'POST', body});
+            if (!result.ok) { const data = await result.json(); alert(data.detail || '导入失败'); return; }
+            await loadEvidenceVersions();
+        }
+        async function publishEvidenceVersion(id) {
+            const result = await fetch(`${API_BASE}/evidence/versions/${id}/publish`, {method: 'POST'});
+            if (!result.ok) { const data = await result.json(); alert(data.detail || '发布失败'); return; }
+            await loadEvidenceVersions();
+        }
+        async function activateEvidenceVersion(id) {
+            const result = await fetch(`${API_BASE}/evidence/versions/${id}/activate`, {method: 'POST'});
+            if (!result.ok) { const data = await result.json(); alert(data.detail || '回退失败'); return; }
+            await loadEvidenceVersions();
+        }
+
+        // ==================== 连接状态 ====================
+        async function checkHealth() {
+            try {
+                const res = await fetch(`${API_BASE}/health`);
+                const data = await res.json();
+                const dot = document.querySelector('#conn-status .status-dot');
+                const text = document.getElementById('conn-status');
+                if (data.status === 'ok') {
+                    dot.className = 'status-dot ok';
+                    text.innerHTML = '<span class="status-dot ok"></span>已连接';
+                } else {
+                    dot.className = 'status-dot degraded';
+                    text.innerHTML = '<span class="status-dot degraded"></span>降级模式';
+                }
+                return data;
+            } catch (e) {
+                const text = document.getElementById('conn-status');
+                text.innerHTML = '<span class="status-dot error"></span>未连接';
+                return null;
+            }
+        }
+        setInterval(checkHealth, 30000);
+        ensureLanSession().then(checkHealth);
+
+        // ==================== 聊天 ====================
+        const chatInput = document.getElementById('chat-input');
+        chatInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+        chatInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+        });
+
+        function appendMessage(role, content, images) {
+            const container = document.getElementById('chat-messages');
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'message ' + role;
+            const time = new Date().toLocaleTimeString();
+            let html = `<div class="message-bubble"></div><div class="message-time">${time}</div>`;
+            msgDiv.innerHTML = html;
+            const bubble = msgDiv.querySelector('.message-bubble');
+            // assistant 消息用 Markdown 渲染；user 消息保持纯文本
+            if (role === 'assistant' && content) {
+                bubble.classList.add('markdown');
+                bubble.innerHTML = renderMarkdown(content);
+            } else {
+                bubble.textContent = content;
+            }
+            // 渲染引用图片
+            if (images && images.length > 0) {
+                renderImages(msgDiv, images);
+            }
+            container.appendChild(msgDiv);
+            container.scrollTop = container.scrollHeight;
+            return bubble;
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const query = input.value.trim();
+            if (!query) return;
+            const sendBtn = document.getElementById('send-btn');
+            sendBtn.disabled = true;
+
+            // 用户消息
+            appendMessage('user', query);
+            messages.push({ role: 'user', content: query });
+            input.value = '';
+            input.style.height = 'auto';
+
+            // 助手占位
+            const bubble = appendMessage('assistant', '');
+            const streamMode = document.getElementById('stream-mode').checked;
+            const topK = parseInt(document.getElementById('top-k').value) || 5;
+            const useRerank = document.getElementById('use-rerank').checked;
+            const lang = document.getElementById('chat-lang').value || undefined;
+
+            // 助手占位气泡添加 markdown class，准备流式渲染
+            bubble.classList.add('markdown');
+
+            try {
+                if (streamMode) {
+                    // SSE 流式
+                    const res = await fetch(`${API_BASE}/v1/chat/completions`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            model: 'rag-model',
+                            messages: messages.slice(-6),  // 保留最近6轮
+                            stream: true,
+                            top_k: topK,
+                            use_rerank: useRerank,
+                            language: lang
+                        })
+                    });
+                    const reader = res.body.getReader();
+                    const decoder = new TextDecoder();
+                    let buffer = '';
+                    let rawText = '';      // 累积原始文本（含 Markdown 标记）
+                    let imageChunks = [];  // 收集所有图片引用
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        buffer += decoder.decode(value, { stream: true });
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop();
+                        for (const line of lines) {
+                            if (!line.startsWith('data: ')) continue;
+                            const data = line.slice(6).trim();
+                            if (data === '[DONE]') continue;
+                            try {
+                                const obj = JSON.parse(data);
+                                if (obj.type === 'images') {
+                                    // 累积图片引用（可能有多次推送）
+                                    imageChunks = imageChunks.concat(obj.chunks || []);
+                                } else if (obj.choices && obj.choices[0].delta && obj.choices[0].delta.content) {
+                                    rawText += obj.choices[0].delta.content;
+                                    // 实时渲染 Markdown（每次 delta 都重新解析）
+                                    bubble.innerHTML = renderMarkdown(rawText);
+                                    // 自动滚动到底部
+                                    document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
+                                }
+                            } catch (e) {}
+                        }
+                    }
+                    // 流结束后渲染引用图片
+                    if (imageChunks.length > 0) {
+                        renderImages(bubble.closest('.message'), imageChunks);
+                    }
+                    messages.push({ role: 'assistant', content: rawText });
+                } else {
+                    // 非流式
+                    const res = await fetch(`${API_BASE}/v1/chat/completions`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            model: 'rag-model',
+                            messages: messages.slice(-6),
+                            stream: false,
+                            top_k: topK,
+                            use_rerank: useRerank,
+                            language: lang
+                        })
+                    });
+                    const data = await res.json();
+                    const answer = data.choices?.[0]?.message?.content || '无响应';
+                    // 渲染 Markdown
+                    bubble.innerHTML = renderMarkdown(answer);
+                    // 非流式响应中可能携带 image_chunks（后端透传）
+                    if (data.image_chunks && data.image_chunks.length > 0) {
+                        renderImages(bubble.closest('.message'), data.image_chunks);
+                    }
+                    messages.push({ role: 'assistant', content: answer });
+                }
+            } catch (e) {
+                bubble.classList.remove('markdown');
+                bubble.textContent = '请求失败: ' + e.message;
+                bubble.style.color = 'var(--danger)';
+            } finally {
+                sendBtn.disabled = false;
+                document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
+            }
+        }
+
+        function clearChat() {
+            document.getElementById('chat-messages').innerHTML = '';
+            messages.length = 0;
+        }
+
+        // ==================== 文档管理 ====================
+        async function loadDocuments() {
+            try {
+                const res = await fetch(`${API_BASE}/documents`);
+                const data = await res.json();
+                document.getElementById('docs-count').textContent = `${data.total || 0} 个文档`;
+                const list = document.getElementById('docs-list');
+                if (!data.documents || data.documents.length === 0) {
+                    list.innerHTML = '<div class="empty-state"><p>暂无文档，请上传文件</p></div>';
+                    return;
+                }
+                let html = `<table><thead><tr><th>文件名</th><th>Chunk 数</th><th style="width:100px">操作</th></tr></thead><tbody>`;
+                data.documents.forEach(doc => {
+                    html += `<tr>
+                        <td>${escapeHtml(doc.file_name)}</td>
+                        <td>${doc.chunk_count}</td>
+                        <td><button class="btn btn-danger" style="padding:4px 10px;font-size:12px" onclick="deleteDoc('${encodeURIComponent(doc.file_name)}')">删除</button></td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+                list.innerHTML = html;
+            } catch (e) {
+                document.getElementById('docs-list').innerHTML = `<div class="empty-state"><p>加载失败: ${e.message}</p></div>`;
+            }
+        }
+
+        async function deleteDoc(fileName) {
+            if (!confirm('确定要删除此文档吗？')) return;
+            try {
+                const res = await fetch(`${API_BASE}/documents?file_name=${fileName}`, { method: 'DELETE', headers: localMutationHeaders });
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    log('文档已删除');
+                    loadDocuments();
+                } else {
+                    alert('删除失败: ' + (data.error || '未知错误'));
+                }
+            } catch (e) {
+                alert('删除失败: ' + e.message);
+            }
+        }
+
+        // 拖拽上传
+        const uploadZone = document.getElementById('upload-zone');
+        ['dragenter', 'dragover'].forEach(evt => {
+            uploadZone.addEventListener(evt, (e) => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+        });
+        ['dragleave', 'drop'].forEach(evt => {
+            uploadZone.addEventListener(evt, (e) => { e.preventDefault(); uploadZone.classList.remove('dragover'); });
+        });
+        uploadZone.addEventListener('drop', (e) => {
+            const files = e.dataTransfer.files;
+            if (files.length > 0) uploadFile(files[0]);
+        });
+
+        function handleFileSelect(e) {
+            if (e.target.files.length > 0) uploadFile(e.target.files[0]);
+        }
+
+        async function uploadFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            try {
+                const res = await fetch(`${API_BASE}/ingest`, {
+                    method: 'POST',
+                    headers: localMutationHeaders,
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.task_id) {
+                    log(`上传任务已创建: ${data.task_id}`);
+                    addTask(data.task_id, file.name);
+                    pollTask(data.task_id);
+                } else {
+                    alert('上传失败: ' + (data.error || '未知错误'));
+                }
+            } catch (e) {
+                alert('上传失败: ' + e.message);
+            }
+        }
+
+        function addTask(taskId, fileName) {
+            const list = document.getElementById('task-list');
+            const div = document.createElement('div');
+            div.className = 'task-item processing';
+            div.id = 'task-' + taskId;
+            div.innerHTML = `<strong>${escapeHtml(fileName)}</strong> <span class="spinner"></span> <span class="task-status">处理中...</span>`;
+            list.insertBefore(div, list.firstChild);
+            activeTasks.set(taskId, { el: div, fileName });
+        }
+
+        async function pollTask(taskId) {
+            const maxAttempts = 300;  // 最长轮询约25分钟
+            for (let i = 0; i < maxAttempts; i++) {
+                await new Promise(r => setTimeout(r, 5000));
+                try {
+                    const res = await fetch(`${API_BASE}/ingest/status/${taskId}`);
+                    const data = await res.json();
+                    const taskEl = document.getElementById('task-' + taskId);
+                    if (!taskEl) return;
+                    const statusSpan = taskEl.querySelector('.task-status');
+                    if (data.status === 'done') {
+                        taskEl.className = 'task-item done';
+                        statusSpan.textContent = `完成 (${data.result?.chunk_count || 0} chunks)`;
+                        taskEl.querySelector('.spinner')?.remove();
+                        log(`任务完成: ${data.file_name}`);
+                        loadDocuments();
+                        return;
+                    } else if (data.status === 'error') {
+                        taskEl.className = 'task-item error';
+                        statusSpan.textContent = '失败: ' + (data.error || '未知错误');
+                        taskEl.querySelector('.spinner')?.remove();
+                        log(`任务失败: ${data.file_name} - ${data.error}`);
+                        return;
+                    } else {
+                        statusSpan.textContent = data.progress || '处理中...';
+                    }
+                } catch (e) {
+                    // 轮询出错继续
+                }
+            }
+        }
+
+        // ==================== 对比分析 ====================
+        async function loadDocumentsForCompare() {
+            try {
+                const res = await fetch(`${API_BASE}/documents`);
+                const data = await res.json();
+                const opts = data.documents?.map(d => `<option value="${escapeHtml(d.file_name)}">${escapeHtml(d.file_name)}</option>`).join('') || '';
+                document.getElementById('compare-doc-a').innerHTML = '<option value="">选择文档 A</option>' + opts;
+                document.getElementById('compare-doc-b').innerHTML = '<option value="">选择文档 B</option>' + opts;
+            } catch (e) {}
+        }
+
+        async function doCompare() {
+            const query = document.getElementById('compare-query').value.trim();
+            const docA = document.getElementById('compare-doc-a').value;
+            const docB = document.getElementById('compare-doc-b').value;
+            if (!query || !docA || !docB) { alert('请填写对比问题并选择两份文档'); return; }
+            if (docA === docB) { alert('请选择两份不同的文档'); return; }
+            const resultDiv = document.getElementById('compare-result');
+            resultDiv.innerHTML = '<div class="empty-state"><span class="spinner"></span><p>对比分析中...</p></div>';
+            try {
+                const res = await fetch(`${API_BASE}/compare`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query, doc_a: docA, doc_b: docB })
+                });
+                const data = await res.json();
+                let html = '';
+                if (data.answer) {
+                    html += `<div class="compare-section"><h3>分析结果</h3><div style="line-height:1.7">${formatMarkdown(data.answer)}</div></div>`;
+                }
+                if (data.sources && data.sources.length > 0) {
+                    html += `<div class="compare-section"><h3>参考来源 (${data.sources.length})</h3>`;
+                    data.sources.forEach(s => {
+                        html += `<div style="margin-bottom:8px;padding:8px;background:#f9f9fb;border-radius:6px;font-size:13px;">
+                            <strong>${escapeHtml(s.file_name)}</strong> 第${s.page}页
+                            <div style="color:var(--text-secondary);margin-top:4px;">${escapeHtml(s.content.substring(0, 200))}...</div>
+                        </div>`;
+                    });
+                    html += '</div>';
+                }
+                resultDiv.innerHTML = html || '<div class="empty-state"><p>无结果</p></div>';
+            } catch (e) {
+                resultDiv.innerHTML = `<div class="empty-state"><p>对比失败: ${e.message}</p></div>`;
+            }
+        }
+
+        // ==================== 系统状态 ====================
+        async function refreshStatus() {
+            const data = await checkHealth();
+            if (!data) {
+                document.getElementById('status-service').textContent = '未连接';
+                document.getElementById('status-service').className = 'value error';
+                return;
+            }
+            document.getElementById('status-service').textContent = data.status === 'ok' ? '正常' : '降级';
+            document.getElementById('status-service').className = 'value ' + (data.status === 'ok' ? 'ok' : 'error');
+            document.getElementById('status-chroma').textContent = data.chroma_connected ? '已连接' : '未连接';
+            document.getElementById('status-chroma').className = 'value ' + (data.chroma_connected ? 'ok' : 'error');
+            document.getElementById('status-docs').textContent = data.document_count ?? '-';
+            document.getElementById('status-chunks').textContent = data.chunk_count ?? '-';
+            log(`状态刷新: status=${data.status}, docs=${data.document_count}, chunks=${data.chunk_count}`);
+        }
+
+        // ==================== 工具函数 ====================
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        /**
+         * Markdown → HTML 渲染（使用 marked.js，支持表格/列表/标题/代码块等）
+         * 降级：marked 未加载时回退到基本转义 + 换行
+         */
+        function renderMarkdown(text) {
+            if (!text) return '';
+            if (typeof marked !== 'undefined' && marked.parse) {
+                try {
+                    // gfm: GitHub Flavored Markdown（表格/删除线）, breaks: 单换行→<br>
+                    return marked.parse(text, { breaks: true, gfm: true });
+                } catch (e) {
+                    console.warn('marked 解析失败，降级:', e);
+                }
+            }
+            // 降级：转义 HTML + 换行
+            return escapeHtml(text).replace(/\n/g, '<br>');
+        }
+
+        // 兼容旧引用（compare 页面使用）
+        function formatMarkdown(text) {
+            return renderMarkdown(text);
+        }
+
+        /**
+         * 渲染图片引用到消息容器
+         * @param {HTMLElement} container - 消息 div（.message）
+         * @param {Array} chunks - 图片 chunk 列表 [{id, file_name, page, description}, ...]
+         */
+        function renderImages(container, chunks) {
+            if (!chunks || chunks.length === 0) return;
+            const imgDiv = document.createElement('div');
+            imgDiv.className = 'message-images';
+            chunks.forEach(chunk => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'image-item';
+
+                const img = document.createElement('img');
+                img.src = `${API_BASE}/images/${chunk.id}`;
+                img.alt = chunk.description || '';
+                img.loading = 'lazy';
+                img.onclick = () => window.open(img.src, '_blank');
+                wrapper.appendChild(img);
+
+                // 图片下方显示来源信息
+                const caption = document.createElement('div');
+                caption.className = 'image-caption';
+                caption.textContent = `${chunk.file_name || ''} P${chunk.page || 0}`;
+                wrapper.appendChild(caption);
+
+                imgDiv.appendChild(wrapper);
+            });
+            container.appendChild(imgDiv);
+        }
+
+        function log(msg) {
+            const area = document.getElementById('log-area');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            if (area.querySelector('.empty-state')) area.innerHTML = '';
+            area.insertBefore(entry, area.firstChild);
+        }
+
+        // 初始化
+        refreshStatus();
+        loadDocuments();
+    </script>
+</body>
+</html>

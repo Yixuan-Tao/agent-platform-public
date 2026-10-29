@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-platform-orchestrator"
+version = "0.1.0"
+description = "agent-platform 编排层：注册表/语义路由/Supervisor/反思校验"
+requires-python = ">=3.11"
+dependencies = [
+  "langgraph>=0.3.0",
+  "langchain-openai>=0.3.0",
+  "langchain-core>=0.3.0",
+  "openai>=1.60.0",
+  "pydantic>=2.10.0",
+  "agent-platform-tools",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["agent_platform.orchestrator*"]

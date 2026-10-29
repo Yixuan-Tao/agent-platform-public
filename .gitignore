@@ -1,0 +1,63 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Env & secrets
+.env
+*.local
+
+# Data / runtime artifacts
+chroma_data/
+mock_chroma_data/
+logs/
+*.db
+*.sqlite3
+runtime_data/
+uploads/
+
+# Node / frontend
+node_modules/
+.next/
+dist/
+build/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Internal / artifact data (sanitized before publishing — contains internal EMC standards, binaries, eval outputs)
+chroma_data_backup_*/
+packages/rag/example/
+packages/rag/metrics/
+*.xlsx
+run_result*.json
+
+# Public export: operational and personal content never belongs in Git.
+.env.*
+!.env.example
+!.env.example.*
+cache/
+certs/
+*.pem
+*.key
+*.pfx
+*.p12
+*.sqlite
+*.db-*
+*.sqlite3-*
+*.log
+*.pdf
+*.docx
+*.pptx
+*.zip
+*.tsbuildinfo
+*_report.json
+qa_eval*
+*_answers.json
+artifacts/
+outputs/

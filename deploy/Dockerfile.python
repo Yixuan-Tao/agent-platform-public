@@ -1,0 +1,7 @@
+FROM python:3.11-slim
+RUN command -v timeout
+RUN pip install --no-cache-dir numpy==2.2.6 pandas==2.2.3 matplotlib==3.10.1
+ENV PYTHONDONTWRITEBYTECODE=1 MPLCONFIGDIR=/tmp/matplotlib
+USER 65532:65532
+WORKDIR /output
+CMD ["python", "-I", "/input/main.py"]

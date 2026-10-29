@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-platform-memory"
+version = "0.1.0"
+description = "agent-platform 短/长期记忆与反馈闭环"
+requires-python = ">=3.11"
+dependencies = [
+  "fakeredis>=2.21.0",
+  "redis>=5.2.0",
+  "chromadb>=0.5.0",
+  "pydantic>=2.10.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["agent_platform.memory*"]

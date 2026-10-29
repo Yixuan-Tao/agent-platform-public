@@ -1,0 +1,50 @@
+# ============================================================
+# 多模态 RAG 系统 — 核心依赖
+# 安装命令: pip install -r requirements.txt
+# ============================================================
+
+# --- Web 框架与服务器 ---
+fastapi>=0.110.0           # 高性能异步 Web 框架，自动生成 OpenAPI 文档
+uvicorn[standard]>=0.29.0  # ASGI 服务器，支持热重载
+
+# --- 向量数据库（ChromaDB 嵌入式）---
+# 注意：Windows + Python 3.12 请使用 1.x（自带预编译包；0.6 的 chroma-hnswlib 需本机编译）
+chromadb>=1.0
+
+# --- API 调用（OpenAI 兼容网关）---
+openai>=1.30.0             # OpenAI 兼容客户端，统一调用网关所有模型
+
+# --- 文档解析 ---
+liteparse>=2.0             # PDF/图片原生解析（Rust + pdfium）
+python-docx>=1.0           # DOCX 纯 Python 兜底解析（本机无 LibreOffice 时启用）
+pymupdf>=1.24              # PDF 矢量图形补充提取（可选，缺失时跳过）
+jieba>=0.42                # 中文分词（可选，缺失时降级为字符切分）
+
+# --- 稀疏向量编码（纯 Python，约 1MB）---
+rank-bm25>=0.2.2           # BM25 算法实现，生成稀疏向量用于关键词检索
+
+# --- 语种检测 ---
+langdetect>=1.0.9          # 自动检测中/英/德文
+
+# --- 数据处理 ---
+numpy>=1.26.0              # 向量运算
+openpyxl>=3.1.0            # 管理员维护的 EMC/器件证据 Excel 模板
+pydantic>=2.0.0            # 数据验证与序列化
+python-multipart>=0.0.9    # 文件上传支持 (FastAPI File Upload)
+aiofiles>=24.0.0           # 异步文件读写
+
+# --- 配置管理 ---
+python-dotenv>=1.0.0       # 从 .env 文件加载环境变量
+
+# --- 可选：评估体系 (P0) ---
+ragas>=0.2.0               # RAG 专用评测框架 (Faithfulness, Context Precision 等)
+datasets>=2.19.0           # HuggingFace datasets，用于加载测试集
+
+# --- 可选：可观测性 (P0) ---
+langfuse>=2.30.0           # 全链路 LLM 追踪 (Tracing + Metrics + Cost)
+
+# --- 可选：异步 HTTP ---
+httpx>=0.27.0              # 异步 HTTP 客户端，用于 URL 文档下载
+
+# --- MCP 服务 (P1) ---
+mcp>=1.0.0                 # MCP Python SDK（官方）

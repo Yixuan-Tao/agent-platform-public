@@ -1,0 +1,25 @@
+# 构建上下文排除：本地运行数据、环境、依赖与缓存不应进入镜像层
+.git
+.github
+.venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.ruff_cache
+node_modules
+**/node_modules
+.next
+**/.next
+logs
+**/logs
+runtime_data
+**/runtime_data
+chroma_data
+**/chroma_data
+*.db
+*.sqlite3
+.env
+.env.*
+!.env.example
+*.log
+packages/rag/rag-console.design
